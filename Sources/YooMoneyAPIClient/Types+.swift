@@ -8,6 +8,11 @@ public extension Components.Schemas.Amount {
         }
         return .init(value: amountValuesSum.string, currency: currency)
     }
+    
+    @available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)
+    init(value: Double, currency: String) {
+        self.init(value: value.string, currency: currency)
+    }
 }
 
 public extension Components.Schemas.CreatePaymentReceipt {
