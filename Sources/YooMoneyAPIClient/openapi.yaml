@@ -1,0 +1,2602 @@
+openapi: 3.1.0
+info:
+  title: YooMoney API
+  description: |
+   API YooMoney позволяет интернет-магазинам принимать платежи с банковских карт, 
+   через SberPay, электронными деньгами и другими способами. 
+   Этот API позволяет обрабатывать онлайн-платежи, отправлять запросы на оплату,
+   сохранять реквизиты для повторяющихся платежей, осуществлять возврат средств и многое другое.
+  version: '1.1.0'
+  contact:
+    name: YooMoney Support
+    url: https://yookassa.ru/developers
+
+servers:
+  - url: https://api.yookassa.ru/v3
+    description: YooMoney API Production Server
+
+security:
+  - BasicAuth: []
+
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+
+  schemas:
+    # Base schemas for common types
+    Amount:
+      type: object
+      required: [value, currency]
+      description: |
+        Сумма.
+      properties:
+        value:
+          type: string
+          pattern: '^[0-9]+(\\.[0-9]+)?$'
+          description: |
+            Сумма в выбранной валюте. Всегда дробное значение. Разделитель дробной части — точка, разделитель тысяч отсутствует. Количество знаков после точки зависит от выбранной валюты.
+          examples:
+            - '1000.00'
+            - '10.15'
+            - '0.50'
+        currency:
+          type: string
+          description: |
+            Трехбуквенный код валюты в формате ISO-4217. Пример: `RUB`. Должен соответствовать валюте субаккаунта (`recipient.gateway_id`), если вы разделяете потоки платежей, и валюте аккаунта (shopId в личном кабинете), если не разделяете.
+          examples:
+            - 'RUB'
+            - 'USD'
+            - 'EUR'
+
+    # Enums
+    PaymentStatus:
+      type: string
+      enum:
+        - pending
+        - waiting_for_capture
+        - succeeded
+        - canceled
+      description: |
+        Статус платежа. Возможные значения:
+        - `pending` — платеж создан и ожидает действий от плательщика;
+        - `waiting_for_capture` — платеж оплачен, деньги авторизованы и ожидают списания;
+        - `succeeded` — платеж успешно завершен;
+        - `canceled` — платеж отменен.
+
+    PaymentMethodType:
+      type: string
+      description: |
+        Код способа оплаты. Возможные значения:
+        - `bank_card` — банковская карта;
+        - `yoo_money` — кошелек ЮMoney;
+        - `sberbank` — SberPay;
+        - `qiwi` — QIWI Кошелек;
+        - `webmoney` — Webmoney;
+        - `alfabank` — Альфа-Клик;
+        - `tinkoff_bank` — Тинькофф Банк;
+        - `cash` — наличные;
+        - `b2b_sberbank` — Сбербанк Бизнес Онлайн;
+        - `mobile_balance` — баланс мобильного телефона;
+        - `apple_pay` — Apple Pay;
+        - `google_pay` — Google Pay;
+        - `installments` — рассрочка;
+        - `sbp` — Система быстрых платежей.
+      enum:
+        - bank_card
+        - yoo_money
+        - sberbank
+        - qiwi
+        - webmoney
+        - alfabank
+        - tinkoff_bank
+        - cash
+        - b2b_sberbank
+        - mobile_balance
+        - apple_pay
+        - google_pay
+        - installments
+        - sbp
+
+    # Base schemas for polymorphic types
+    PaymentMethodBase:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - bank_card
+            - yoo_money
+            - sberbank
+            - qiwi
+            - webmoney
+            - alfabank
+            - tinkoff_bank
+            - cash
+            - b2b_sberbank
+            - mobile_balance
+            - apple_pay
+            - google_pay
+            - installments
+            - sbp
+          description: |
+            Код способа оплаты. Возможные значения:
+            - `bank_card` — банковская карта;
+            - `yoo_money` — кошелек ЮMoney;
+            - `sberbank` — SberPay;
+            - `qiwi` — QIWI Кошелек;
+            - `webmoney` — Webmoney;
+            - `alfabank` — Альфа-Клик;
+            - `tinkoff_bank` — Тинькофф Банк;
+            - `cash` — наличные;
+            - `b2b_sberbank` — Сбербанк Бизнес Онлайн;
+            - `mobile_balance` — баланс мобильного телефона;
+            - `apple_pay` — Apple Pay;
+            - `google_pay` — Google Pay;
+            - `installments` — рассрочка;
+            - `sbp` — Система быстрых платежей.
+        id:
+          type: string
+          description: |
+            Идентификатор записи о сохраненных платежных данных.
+          readOnly: true
+        saved:
+          type: boolean
+          description: |
+            Признак сохраненных платежных данных. Значение true говорит о том, что данные были сохранены для повторного использования.
+          readOnly: true
+        title:
+          type: string
+          description: |
+            Название способа оплаты.
+          readOnly: true
+        status:
+          type: string
+          description: |
+            Статус платежных данных. Возможные значения:
+            - `pending` — данные сохранены для повторного использования, но пока не использовались;
+            - `active` — данные использовались для успешного платежа;
+            - `inactive` — не удалось провести платеж с этими данными.
+          enum:
+            - pending
+            - active
+            - inactive
+
+    PaymentMethod:
+      oneOf:
+        - $ref: '#/components/schemas/PaymentMethodBankCard'
+        - $ref: '#/components/schemas/PaymentMethodYooMoney'
+        - $ref: '#/components/schemas/PaymentMethodSberbank'
+        - $ref: '#/components/schemas/PaymentMethodQiwi'
+        - $ref: '#/components/schemas/PaymentMethodWebmoney'
+        - $ref: '#/components/schemas/PaymentMethodAlfabank'
+        - $ref: '#/components/schemas/PaymentMethodTinkoffBank'
+        - $ref: '#/components/schemas/PaymentMethodCash'
+        - $ref: '#/components/schemas/PaymentMethodB2BSberbank'
+        - $ref: '#/components/schemas/PaymentMethodMobileBalance'
+        - $ref: '#/components/schemas/PaymentMethodApplePay'
+        - $ref: '#/components/schemas/PaymentMethodGooglePay'
+        - $ref: '#/components/schemas/PaymentMethodInstallments'
+        - $ref: '#/components/schemas/PaymentMethodSBP'
+      discriminator:
+        propertyName: type
+        mapping:
+          bank_card: '#/components/schemas/PaymentMethodBankCard'
+          yoo_money: '#/components/schemas/PaymentMethodYooMoney'
+          sberbank: '#/components/schemas/PaymentMethodSberbank'
+          qiwi: '#/components/schemas/PaymentMethodQiwi'
+          webmoney: '#/components/schemas/PaymentMethodWebmoney'
+          alfabank: '#/components/schemas/PaymentMethodAlfabank'
+          tinkoff_bank: '#/components/schemas/PaymentMethodTinkoffBank'
+          cash: '#/components/schemas/PaymentMethodCash'
+          b2b_sberbank: '#/components/schemas/PaymentMethodB2BSberbank'
+          mobile_balance: '#/components/schemas/PaymentMethodMobileBalance'
+          apple_pay: '#/components/schemas/PaymentMethodApplePay'
+          google_pay: '#/components/schemas/PaymentMethodGooglePay'
+          installments: '#/components/schemas/PaymentMethodInstallments'
+          sbp: '#/components/schemas/PaymentMethodSBP'
+
+    PaymentMethodBankCard:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: bank_card
+              default: bank_card
+            card:
+              type: object
+              properties:
+                first6:
+                  type: string
+                  description: |
+                    Первые 6 цифр номера карты (BIN). При оплате картой, сохраненной в ЮKassa и других сервисах, переданный BIN может не соответствовать значениям `last4`, `expiry_year`, `expiry_month`.
+                  example: "123456"
+                last4:
+                  type: string
+                  description: Последние 4 цифры номера карты.
+                  example: "1234"
+                expiry_month:
+                  type: string
+                  description: Срок действия, месяц, MM.
+                  example: "12"
+                expiry_year:
+                  type: string
+                  description: Срок действия, год, YYYY.
+                  example: "2024"
+                card_type:
+                  type: string
+                  description: |
+                    Тип банковской карты. Возможные значения: `MasterCard` (для карт Mastercard и Maestro), `Visa` (для карт Visa и Visa Electron), `Mir`, `UnionPay`, `JCB`, `AmericanExpress`, `DinersClub`, `DiscoverCard`, `InstaPayment`, `InstaPaymentTM`, `Laser`, `Dankort`, `Solo`, `Switch` и `Unknown`.
+                  enum:
+                    - MasterCard
+                    - Visa
+                    - Mir
+                    - UnionPay
+                    - JCB
+                    - AmericanExpress
+                    - DinersClub
+                    - DiscoverCard
+                    - InstaPayment
+                    - InstaPaymentTM
+                    - Laser
+                    - Dankort
+                    - Solo
+                    - Switch
+                    - Unknown
+                card_product:
+                  type: object
+                  description: |
+                    Карточный продукт платежной системы, с которым ассоциирована банковская карта. Например, карточные продукты платежной системы Мир: `Mir Classic`, `Mir Classic Credit`, `MIR Privilege Plus` и другие.
+                  properties:
+                    code:
+                      type: string
+                      description: Код карточного продукта.
+                      example: "MCP"
+                    name:
+                      type: string
+                      description: Название карточного продукта.
+                      example: "MIR Privilege"
+                issuer_country:
+                  type: string
+                  description: |
+                    Код страны, в которой выпущена карта. Передается в формате ISO-3166 alpha-2.
+                  example: "RU"
+                issuer_name:
+                  type: string
+                  description: Наименование банка, выпустившего карту.
+                source:
+                  type: string
+                  description: |
+                    Источник данных банковской карты. Возможные значения: `mir_pay`, `apple_pay`, `google_pay`. Присутствует, если пользователь при оплате выбрал карту, сохраненную в Mir Pay, Apple Pay или Google Pay.
+                  enum:
+                    - mir_pay
+                    - apple_pay
+                    - google_pay
+              required:
+                - last4
+                - expiry_year
+                - expiry_month
+                - card_type
+
+    PaymentMethodYooMoney:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: yoo_money
+              default: yoo_money
+            account_number:
+              type: string
+              description: |
+                Номер кошелька ЮMoney, с которого произведена оплата.
+              example: "12345678901234"
+
+    PaymentMethodSberbank:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: sberbank
+              default: sberbank
+            phone:
+              type: string
+              description: |
+                Телефон пользователя, на который зарегистрирован аккаунт в СберБанк Онлайн.
+              example: "+79991234567"
+
+    PaymentMethodQiwi:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: qiwi
+              default: qiwi
+            phone:
+              type: string
+              description: |
+                Телефон пользователя, на который зарегистрирован QIWI Wallet.
+              example: "+79991234567"
+
+    PaymentMethodWebmoney:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: webmoney
+              default: webmoney
+
+    PaymentMethodAlfabank:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: alfabank
+              default: alfabank
+            login:
+              type: string
+              description: |
+                Логин пользователя в Альфа-Клике.
+              example: "user123"
+
+    PaymentMethodTinkoffBank:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: tinkoff_bank
+              default: tinkoff_bank
+            phone:
+              type: string
+              description: |
+                Телефон пользователя, на который зарегистрирован аккаунт в Тинькофф Банке.
+              example: "+79991234567"
+
+    PaymentMethodCash:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: cash
+              default: cash
+
+    PaymentMethodB2BSberbank:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: b2b_sberbank
+              default: b2b_sberbank
+            payer_bank_details:
+              type: object
+              properties:
+                account:
+                  type: string
+                  description: |
+                    Номер счета организации.
+                address:
+                  type: string
+                  description: |
+                    Адрес организации.
+                bank_bic:
+                  type: string
+                  description: |
+                    БИК банка организации.
+                bank_name:
+                  type: string
+                  description: |
+                    Наименование банка организации.
+                inn:
+                  type: string
+                  description: |
+                    ИНН организации.
+                kpp:
+                  type: string
+                  description: |
+                    КПП организации.
+                name:
+                  type: string
+                  description: |
+                    Наименование организации.
+                payment_purpose:
+                  type: string
+                  description: |
+                    Назначение платежа (не более 210 символов).
+              required:
+                - account
+                - bank_bic
+                - inn
+                - name
+                - payment_purpose
+
+    PaymentMethodMobileBalance:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: mobile_balance
+              default: mobile_balance
+            phone:
+              type: string
+              description: |
+                Телефон, с баланса которого будет произведен платеж.
+              example: "+79991234567"
+
+    PaymentMethodApplePay:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: apple_pay
+              default: apple_pay
+
+    PaymentMethodGooglePay:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: google_pay
+              default: google_pay
+
+    PaymentMethodInstallments:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: installments
+              default: installments
+
+    PaymentMethodSBP:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodBase'
+        - type: object
+          properties:
+            type:
+              const: sbp
+              default: sbp
+            bank_id:
+              type: string
+              description: SBP member bank ID
+              example: "100000000111"
+
+    # Payment creation and response schemas
+    Payment:
+      type: object
+      description: |
+        Объект платежа (`Payment`) содержит всю информацию о платеже, актуальную на текущий момент времени. Он формируется при создании платежа и приходит в ответ на любой запрос, связанный с платежами.
+
+        Объект может содержать параметры и значения, не описанные в этом Справочнике API. Их следует игнорировать.
+      required:
+        - id
+        - status
+        - amount
+        - created_at
+        - test
+        - paid
+        - refundable
+      properties:
+        id:
+          type: string
+          description: |
+            Идентификатор платежа в ЮKassa.
+          readOnly: true
+          example: "22e12f66-000f-5000-8000-18db351245c7"
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+          description: |
+            Статус платежа. Возможные значения: `pending`, `waiting_for_capture`, `succeeded` и `canceled`. Подробнее про жизненный цикл платежа.
+          readOnly: true
+        amount:
+          $ref: '#/components/schemas/Amount'
+          description: |
+            Сумма платежа. Иногда партнеры ЮKassa берут с пользователя дополнительную комиссию, которая не входит в эту сумму.
+        income_amount:
+          $ref: '#/components/schemas/Amount'
+          description: |
+            Сумма платежа, которую получит магазин, — значение `amount` за вычетом комиссии ЮKassa. Если вы партнер и для аутентификации запросов используете OAuth-токен, запросите у магазина право на получение информации о комиссиях при платежах.
+        description:
+          type: string
+          description: |
+            Описание транзакции (не более 128 символов), которое вы увидите в личном кабинете ЮKassa, а пользователь — при оплате. Например: «Оплата заказа № 72 для user@yoomoney.ru».
+          maxLength: 128
+          example: "Заказ №72"
+        recipient:
+          $ref: '#/components/schemas/Recipient'
+          description: |
+            Получатель платежа.
+        payment_method:
+          $ref: '#/components/schemas/PaymentMethod'
+          description: |
+            Способ оплаты, который был использован для этого платежа.
+        captured_at:
+          type: string
+          format: date-time
+          description: |
+            Время подтверждения платежа. Указывается по UTC и передается в формате ISO 8601.
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          description: |
+            Время создания заказа. Указывается по UTC и передается в формате ISO 8601. 
+            Пример: `2017-11-03T11:52:31.827Z`
+          example: "2017-11-03T11:52:31.827Z"
+        expires_at:
+          type: string
+          format: date-time
+          description: |
+            Время, до которого вы можете бесплатно отменить или подтвердить платеж. В указанное время платеж в статусе `waiting_for_capture` будет автоматически отменен. Указывается по UTC и передается в формате ISO 8601.
+          example: "2017-11-03T11:52:31.827Z"
+        confirmation:
+          $ref: '#/components/schemas/Confirmation'
+          description: |
+            Выбранный способ подтверждения платежа. Присутствует, когда платеж ожидает подтверждения от пользователя.
+        test:
+          type: boolean
+          description: |
+            Признак тестовой операции.
+        refunded_amount:
+          $ref: '#/components/schemas/Amount'
+          description: |
+            Сумма, которая вернулась пользователю. Присутствует, если у этого платежа есть успешные возвраты.
+          readOnly: true
+        paid:
+          type: boolean
+          description: |
+            Признак оплаты заказа.
+          readOnly: true
+        refundable:
+          type: boolean
+          description: |
+            Возможность провести возврат по API.
+          readOnly: true
+        receipt_registration:
+          type: string
+          description: |
+            Статус регистрации чека. Возможные значения:
+            - `pending` — данные в обработке;
+            - `succeeded` — чек успешно зарегистрирован;
+            - `canceled` — чек зарегистрировать не удалось; если используете Чеки от ЮKassa, обратитесь в техническую поддержку, в остальных случаях сформируйте чек вручную.
+          enum:
+            - pending
+            - succeeded
+            - canceled
+        metadata:
+          type: object
+          description: |
+            Любые дополнительные данные, которые нужны вам для работы (например, ваш внутренний идентификатор заказа). Передаются в виде набора пар «ключ-значение» и возвращаются в ответе от ЮKassa. Ограничения: максимум 16 ключей, имя ключа не больше 32 символов, значение ключа не больше 512 символов, тип данных — строка в формате UTF-8.
+          maxProperties: 16
+          additionalProperties:
+            type: string
+            maxLength: 512
+        cancellation_details:
+          type: object
+          description: |
+            Комментарий к статусу `canceled`: кто отменил платеж и по какой причине.
+          properties:
+            party:
+              type: string
+              description: |
+                Участник процесса платежа, который принял решение об отмене транзакции. Может принимать значения `yoo_money`, `payment_network` и `merchant`.
+              enum:
+                - merchant
+                - yoo_money
+                - payment_network
+            reason:
+              type: string
+              description: |
+                Причина отмены платежа.
+              enum:
+                - 3d_secure_failed
+                - call_issuer
+                - canceled_by_merchant
+                - card_expired
+                - country_forbidden
+                - fraud_suspected
+                - general_decline
+                - identification_required
+                - insufficient_funds
+                - internal_timeout
+                - invalid_card_number
+                - invalid_csc
+                - issuer_unavailable
+                - payment_method_limit_exceeded
+                - payment_method_restricted
+                - permission_revoked
+                - unsupported_mobile_operator
+                - expired_on_confirmation
+        authorization_details:
+          type: object
+          description: |
+            Данные об авторизации платежа при оплате банковской картой.
+            Присутствуют только для этих способов оплаты: банковская карта, Mir Pay, SberPay, T-Pay.
+          properties:
+            rrn:
+              type: string
+              description: |
+                Retrieval Reference Number — уникальный идентификатор транзакции в системе эмитента.
+            auth_code:
+              type: string
+              description: |
+                Код авторизации. Выдается эмитентом и подтверждает проведение авторизации.
+            three_d_secure:
+              type: object
+              description: Данные о прохождении пользователем аутентификации по 3‑D Secure для подтверждения платежа.
+              properties:
+                applied:
+                  type: boolean
+                  description: |
+                    Отображение пользователю формы для прохождения аутентификации по 3‑D Secure. Возможные значения:
+                    - `true` — ЮKassa отобразила пользователю форму, чтобы он мог пройти аутентификацию по 3‑D Secure;
+                    - `false` — платеж проходил без аутентификации по 3‑D Secure.
+        transfers:
+          type: array
+          description: |
+            Данные о распределении денег — сколько и в какой магазин нужно перевести. Присутствует, если вы используете Сплитование платежей.
+          items:
+            $ref: '#/components/schemas/Transfer'
+        deal:
+          $ref: '#/components/schemas/Deal'
+          description: |
+            Данные о сделке, в составе которой проходит платеж. Присутствует, если вы проводите Безопасную сделку.
+        merchant_customer_id:
+          type: string
+          description: |
+            Идентификатор покупателя в вашей системе, например электронная почта или номер телефона. Не более 200 символов. Присутствует, если вы хотите запомнить банковскую карту и отобразить ее при повторном платеже в виджете ЮKassa.
+          maxLength: 200
+
+    CreatePaymentRequest:
+      type: object
+      required:
+        - amount
+      properties:
+        amount:
+          $ref: '#/components/schemas/Amount'
+          description: |
+            Сумма платежа. Иногда партнеры ЮKassa берут с пользователя дополнительную комиссию, которая не входит в эту сумму.
+        description:
+          type: string
+          maxLength: 128
+          description: |
+            Описание транзакции (не более 128 символов), которое вы увидите в личном кабинете ЮKassa, а пользователь — при оплате. Например: «Оплата заказа № 72 для user@yoomoney.ru».
+        payment_token:
+          type: string
+          description: |
+            Одноразовый токен для проведения оплаты, сформированный с помощью Checkout.js или мобильного SDK.
+        payment_method_id:
+          type: string
+          description: |
+            Идентификатор сохраненного способа оплаты.
+        payment_method_data:
+          $ref: '#/components/schemas/PaymentMethodData'
+          description: |
+            Данные для оплаты конкретным способом (`payment_method`). Вы можете не передавать этот объект в запросе. В этом случае пользователь будет выбирать способ оплаты на стороне ЮKassa.
+        confirmation:
+          $ref: '#/components/schemas/Confirmation'
+          description: |
+            Данные, необходимые для инициирования выбранного сценария подтверждения платежа пользователем.
+        save_payment_method:
+          type: boolean
+          description: |
+            Сохранить платежный метод для проведения рекуррентных платежей.
+        capture:
+          type: boolean
+          default: true
+          description: |
+            Автоматически принять поступившую оплату. Значение по умолчанию — true.
+            Если вы хотите принять оплату отдельным запросом, передайте false. Тогда после оплаты платеж перейдет в статус waiting_for_capture, и для принятия оплаты нужно будет вызвать метод capture.
+        client_ip:
+          type: string
+          description: |
+            IP-адрес покупателя. Если не указан, используется IP-адрес TCP-подключения.
+        metadata:
+          type: object
+          description: |
+            Любые дополнительные данные, которые нужны вам для работы (например, ваш внутренний идентификатор заказа). Передаются в виде набора пар «ключ-значение» и возвращаются в ответе от ЮKassa. Ограничения: максимум 16 ключей, имя ключа не больше 32 символов, значение ключа не больше 512 символов, тип данных — строка в формате UTF-8.
+          maxProperties: 16
+          additionalProperties:
+            type: string
+            maxLength: 512
+        receipt:
+          $ref: '#/components/schemas/CreatePaymentReceipt'
+          description: |
+            Данные для формирования чека в онлайн-кассе (для соблюдения 54-ФЗ).
+        merchant_customer_id:
+          type: string
+          maxLength: 200
+          description: |
+            Идентификатор покупателя в вашей системе, например электронная почта или номер телефона. Не более 200 символов. Присутствует, если вы хотите запомнить банковскую карту и отобразить ее при повторном платеже в виджете ЮKassa.
+        recipient:
+          $ref: '#/components/schemas/Recipient'
+          description: |
+            Получатель платежа. Используется для разделения потоков платежей в рамках одного аккаунта или создания платежа в адрес другого аккаунта.
+        transfers:
+          type: array
+          description: |
+            Данные о распределении денег — сколько и в какой магазин нужно перевести. Используется при сплитовании платежа.
+          items:
+            $ref: '#/components/schemas/Transfer'
+        deal:
+          $ref: '#/components/schemas/Deal'
+          description: |
+            Данные о сделке, в составе которой проходит платеж. Необходимо передавать, если вы проводите Безопасную сделку.
+
+    PaymentMethodData:
+      oneOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBankCard'
+        - $ref: '#/components/schemas/PaymentMethodDataYooMoney'
+        - $ref: '#/components/schemas/PaymentMethodDataSberbank'
+        - $ref: '#/components/schemas/PaymentMethodDataQiwi'
+        - $ref: '#/components/schemas/PaymentMethodDataWebmoney'
+        - $ref: '#/components/schemas/PaymentMethodDataAlfabank'
+        - $ref: '#/components/schemas/PaymentMethodDataTinkoffBank'
+        - $ref: '#/components/schemas/PaymentMethodDataCash'
+        - $ref: '#/components/schemas/PaymentMethodDataB2BSberbank'
+        - $ref: '#/components/schemas/PaymentMethodDataMobileBalance'
+        - $ref: '#/components/schemas/PaymentMethodDataApplePay'
+        - $ref: '#/components/schemas/PaymentMethodDataGooglePay'
+        - $ref: '#/components/schemas/PaymentMethodDataInstallments'
+        - $ref: '#/components/schemas/PaymentMethodDataSBP'
+      discriminator:
+        propertyName: type
+        mapping:
+          bank_card: '#/components/schemas/PaymentMethodDataBankCard'
+          yoo_money: '#/components/schemas/PaymentMethodDataYooMoney'
+          sberbank: '#/components/schemas/PaymentMethodDataSberbank'
+          qiwi: '#/components/schemas/PaymentMethodDataQiwi'
+          webmoney: '#/components/schemas/PaymentMethodDataWebmoney'
+          alfabank: '#/components/schemas/PaymentMethodDataAlfabank'
+          tinkoff_bank: '#/components/schemas/PaymentMethodDataTinkoffBank'
+          cash: '#/components/schemas/PaymentMethodDataCash'
+          b2b_sberbank: '#/components/schemas/PaymentMethodDataB2BSberbank'
+          mobile_balance: '#/components/schemas/PaymentMethodDataMobileBalance'
+          apple_pay: '#/components/schemas/PaymentMethodDataApplePay'
+          google_pay: '#/components/schemas/PaymentMethodDataGooglePay'
+          installments: '#/components/schemas/PaymentMethodDataInstallments'
+          sbp: '#/components/schemas/PaymentMethodDataSBP'
+
+    PaymentMethodDataBase:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - bank_card
+            - yoo_money
+            - sberbank
+            - qiwi
+            - webmoney
+            - alfabank
+            - tinkoff_bank
+            - cash
+            - b2b_sberbank
+            - mobile_balance
+            - apple_pay
+            - google_pay
+            - installments
+            - sbp
+          description: |
+            Код способа оплаты. Возможные значения:
+            - `bank_card` — банковская карта;
+            - `yoo_money` — кошелек ЮMoney;
+            - `sberbank` — SberPay;
+            - `qiwi` — QIWI Кошелек;
+            - `webmoney` — Webmoney;
+            - `alfabank` — Альфа-Клик;
+            - `tinkoff_bank` — Тинькофф Банк;
+            - `cash` — наличные;
+            - `b2b_sberbank` — Сбербанк Бизнес Онлайн;
+            - `mobile_balance` — баланс мобильного телефона;
+            - `apple_pay` — Apple Pay;
+            - `google_pay` — Google Pay;
+            - `installments` — рассрочка;
+            - `sbp` — Система быстрых платежей.
+
+    PaymentMethodDataBankCard:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: bank_card
+              default: bank_card
+            card:
+              type: object
+              properties:
+                number:
+                  type: string
+                  description: |
+                    Номер банковской карты. Формат: только цифры, без пробелов.
+                  example: "4111111111111111"
+                expiry_year:
+                  type: string
+                  description: |
+                    Срок действия, год, YYYY.
+                  example: "2024"
+                expiry_month:
+                  type: string
+                  description: |
+                    Срок действия, месяц, MM.
+                  example: "12"
+                csc:
+                  type: string
+                  description: |
+                    CVV2/CVC2/ППК2 код. Формат: от 3 до 4 цифр.
+                  example: "123"
+                cardholder:
+                  type: string
+                  description: |
+                    Имя держателя карты. Формат: ГОСТ 7.79-2000 (ISO 9).
+                  example: "IVAN IVANOV"
+
+    PaymentMethodDataYooMoney:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: yoo_money
+              default: yoo_money
+
+    PaymentMethodDataSberbank:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: sberbank
+              default: sberbank
+            phone:
+              type: string
+              description: |
+                Телефон пользователя, привязанный к Сбербанк Онлайн. Строка длиной от 4 до 15 символов, содержащая только цифры.
+              example: "79000000000"
+
+    PaymentMethodDataQiwi:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: qiwi
+              default: qiwi
+            phone:
+              type: string
+              description: |
+                Телефон пользователя, привязанный к QIWI Wallet. Строка длиной от 4 до 15 символов, содержащая только цифры.
+              example: "79000000000"
+
+    PaymentMethodDataWebmoney:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: webmoney
+              default: webmoney
+
+    PaymentMethodDataAlfabank:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: alfabank
+              default: alfabank
+            login:
+              type: string
+              description: |
+                Логин пользователя в Альфа-Клике.
+              example: "ivan.ivanov"
+
+    PaymentMethodDataTinkoffBank:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: tinkoff_bank
+              default: tinkoff_bank
+
+    PaymentMethodDataCash:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: cash
+              default: cash
+
+    PaymentMethodDataB2BSberbank:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: b2b_sberbank
+              default: b2b_sberbank
+            payer_bank_details:
+              type: object
+              required:
+                - account
+                - bank_bic
+                - inn
+                - name
+                - payment_purpose
+              properties:
+                account:
+                  type: string
+                  description: |
+                    Номер счета организации.
+                address:
+                  type: string
+                  description: |
+                    Адрес организации.
+                bank_bic:
+                  type: string
+                  description: |
+                    БИК банка организации.
+                bank_name:
+                  type: string
+                  description: |
+                    Наименование банка организации.
+                inn:
+                  type: string
+                  description: |
+                    ИНН организации.
+                kpp:
+                  type: string
+                  description: |
+                    КПП организации.
+                name:
+                  type: string
+                  description: |
+                    Наименование организации.
+                payment_purpose:
+                  type: string
+                  description: |
+                    Назначение платежа (не более 210 символов).
+                  maxLength: 210
+
+    PaymentMethodDataMobileBalance:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: mobile_balance
+              default: mobile_balance
+            phone:
+              type: string
+              description: Phone number to be debited
+              example: "+79991234567"
+
+    Metadata:
+      type: object
+      description: |
+        Любые дополнительные данные, которые нужны вам для работы (например, ваш внутренний идентификатор заказа). Передаются в виде набора пар «ключ-значение» и возвращаются в ответе от ЮKassa. Ограничения: максимум 16 ключей, имя ключа не больше 32 символов, значение ключа не больше 512 символов, тип данных — строка в формате UTF-8.
+      maxProperties: 16
+      additionalProperties:
+        type: string
+        maxLength: 512
+
+    PaymentsList:
+      type: object
+      required:
+        - type
+        - items
+      properties:
+        type:
+          type: string
+          enum:
+            - list
+          default: list
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Payment'
+        next_cursor:
+          type: string
+          description: Токен для получения следующей страницы списка.
+
+    Error:
+      type: object
+      required:
+        - code
+        - description
+      properties:
+        code:
+          type: string
+          description: Код ошибки.
+          example: "invalid_request"
+        description:
+          type: string
+          description: Описание ошибки.
+          example: "Неверные параметры запроса"
+        parameter:
+          type: string
+          description: Параметр, в котором возникла ошибка.
+          example: "amount.value"
+        retry_after:
+          type: integer
+          description: Время в секундах, через которое можно повторить запрос.
+          example: 60
+        type:
+          type: string
+          description: Тип ошибки.
+          example: "error"
+
+    Recipient:
+      type: object
+      properties:
+        account_id:
+          type: string
+          description: Идентификатор магазина в ЮKassa.
+          example: "5555555555"
+        gateway_id:
+          type: string
+          description: Идентификатор субаккаунта. Используется для разделения потоков платежей в рамках одного аккаунта.
+          example: "1555555555"
+
+    CreateRefundRequest:
+      type: object
+      required:
+        - payment_id
+        - amount
+      properties:
+        payment_id:
+          type: string
+          description: |
+            Идентификатор платежа для возврата.
+          example: "22e12f66-000f-5000-8000-18db351245c7"
+        amount:
+          $ref: '#/components/schemas/Amount'
+          description: |
+            Сумма возврата. Должна быть меньше или равна сумме платежа.
+        description:
+          type: string
+          description: |
+            Комментарий к возврату. Не более 128 символов.
+          maxLength: 128
+          example: "Возврат заказа №37"
+        receipt:
+          $ref: '#/components/schemas/Receipt'
+          description: |
+            Данные для формирования чека возврата в онлайн-кассе.
+        sources:
+          type: array
+          description: |
+            Данные о том, с какого магазина и какую сумму нужно удержать для проведения возврата. Присутствует, если вы используете Сплитование платежей.
+          items:
+            $ref: '#/components/schemas/Source'
+
+    Source:
+      type: object
+      required:
+        - account_id
+        - amount
+      properties:
+        account_id:
+          type: string
+          description: |
+            Идентификатор магазина, для которого вы хотите провести возврат.
+          example: "5555555555"
+        amount:
+          $ref: '#/components/schemas/Amount'
+          description: |
+            Сумма возврата.
+
+    CapturePaymentRequest:
+      type: object
+      properties:
+        amount:
+          $ref: '#/components/schemas/Amount'
+          description: |
+            Подтверждаемая сумма списания. Должна быть меньше или равна сумме платежа. Если не указана, то списание произойдет на всю сумму платежа.
+        receipt:
+          $ref: '#/components/schemas/Receipt'
+          description: |
+            Данные для формирования чека в онлайн-кассе.
+        transfers:
+          type: array
+          description: |
+            Данные о распределении денег — сколько и в какой магазин нужно перевести. Присутствует, если вы используете Сплитование платежей.
+          items:
+            $ref: '#/components/schemas/Transfer'
+        deal:
+          $ref: '#/components/schemas/Deal'
+          description: |
+            Данные о сделке, в составе которой проходит платеж. Необходимо передавать, если вы проводите Безопасную сделку.
+
+    Settlement:
+      type: object
+      description: |
+        Данные о распределении денег в магазин.
+      required:
+        - type
+        - amount
+      properties:
+        type:
+          type: string
+          description: |
+            Тип распределения. Возможные значения:
+            payout — выплата продавцу;
+            refund — возврат покупателю;
+            credit_funds — перевод вознаграждения за выданный кредит;
+            debit_funds — возврат вознаграждения за выданный кредит.
+          enum:
+            - payout
+            - refund
+            - credit_funds
+            - debit_funds
+        amount:
+          $ref: '#/components/schemas/Amount'
+          description: |
+            Сумма распределения.
+
+    Refund:
+      allOf:
+        - $ref: '#/components/schemas/CreateRefundRequest'
+        - type: object
+          required:
+            - id
+            - status
+            - created_at
+          properties:
+            id:
+              type: string
+              description: |
+                Идентификатор возврата.
+              example: "216749da-000f-50be-b000-096747fad91e"
+            status:
+              type: string
+              description: |
+                Статус возврата. Возможные значения:
+                - `pending` — возврат создан и ожидает подтверждения от эмитента;
+                - `succeeded` — возврат успешно завершен;
+                - `canceled` — возврат отменен.
+              enum:
+                - pending
+                - succeeded
+                - canceled
+            created_at:
+              type: string
+              format: date-time
+              description: |
+                Время создания возврата. Указывается по UTC и передается в формате ISO 8601.
+              example: "2017-11-03T11:52:31.827Z"
+            deal:
+              $ref: '#/components/schemas/Deal'
+              description: |
+                Данные о сделке, в составе которой проходит возврат. Присутствует, если возврат происходит в рамках Безопасной сделки.
+
+    ConfirmationCommon:
+      type: object
+      properties:
+        type:
+          type: string
+          description: |
+            Код сценария подтверждения. Возможные значения:
+            - `redirect` — подтверждение на странице ЮKassa;
+            - `embedded` — подтверждение через виджет ЮKassa;
+            - `external` — подтверждение на странице партнера;
+            - `qr` — подтверждение по QR-коду;
+            - `mobile_application` — подтверждение через мобильное приложение.
+          enum:
+            - redirect
+            - embedded
+            - external
+            - qr
+            - mobile_application
+      required:
+        - type
+
+    Confirmation:
+      oneOf:
+        - $ref: '#/components/schemas/ConfirmationRedirect'
+        - $ref: '#/components/schemas/ConfirmationEmbedded'
+        - $ref: '#/components/schemas/ConfirmationExternal'
+        - $ref: '#/components/schemas/ConfirmationQr'
+        - $ref: '#/components/schemas/ConfirmationMobileApplication'
+      discriminator:
+        propertyName: type
+        mapping:
+          redirect: '#/components/schemas/ConfirmationRedirect'
+          embedded: '#/components/schemas/ConfirmationEmbedded'
+          external: '#/components/schemas/ConfirmationExternal'
+          qr: '#/components/schemas/ConfirmationQr'
+          mobile_application: '#/components/schemas/ConfirmationMobileApplication'
+
+    ConfirmationRedirect:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/ConfirmationCommon'
+        - type: object
+          properties:
+            return_url:
+              type: string
+              format: uri
+              description: |
+                URL, на который вернется пользователь после подтверждения или отмены платежа.
+            confirmation_url:
+              type: string
+              format: uri
+              description: |
+                URL, на который необходимо перенаправить пользователя для подтверждения платежа.
+            enforce:
+              type: boolean
+              description: |
+                Требование принудительного подтверждения платежа покупателем, требование дополнительной авторизации при оплате с помощью сохраненного способа оплаты.
+                Значение true: платеж всегда требует подтверждения покупателем, даже если способ оплаты уже был когда-то успешно использован.
+                Значение false: не требовать от покупателя подтверждения платежа, если способ оплаты уже был когда-то успешно использован.
+                Это поведение можно переопределить, передав true в параметре confirmation.enforce при создании платежа.
+                Если у платежа есть признак тестовый, в этом параметре всегда будет значение true.
+              default: false
+            locale:
+              type: string
+              description: |
+                Язык интерфейса, писем и смс, которые будут отправлены пользователю. Формат соответствует ISO/IEC 15897.
+                Возможные значения: ru_RU, en_US. Регистр важен.
+
+    ConfirmationEmbedded:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/ConfirmationCommon'
+        - type: object
+          properties:
+            confirmation_token:
+              type: string
+              description: |
+                Токен для инициализации платежного виджета ЮKassa.
+              readOnly: true
+
+    ConfirmationExternal:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/ConfirmationCommon'
+        - type: object
+
+    ConfirmationQr:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/ConfirmationCommon'
+        - type: object
+          properties:
+            confirmation_data:
+              type: string
+              description: |
+                Данные для генерации QR-кода.
+              readOnly: true
+
+    ConfirmationMobileApplication:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/ConfirmationCommon'
+        - type: object
+          required:
+            - return_url
+          properties:
+            return_url:
+              type: string
+              format: uri
+              description: |
+                URL, на который вернется пользователь после подтверждения или отмены платежа.
+            confirmation_url:
+              type: string
+              format: uri
+              description: |
+                URL, который необходимо открыть в мобильном приложении для подтверждения платежа.
+              readOnly: true
+
+    Receipt:
+      type: object
+      description: |
+        Объект чека (`Receipt`) содержит актуальную информацию о чеке, созданном для платежа или возврата.
+      required:
+        - id
+        - type
+        - status
+        - items
+      properties:
+        id:
+          type: string
+          description: |
+            Идентификатор чека в ЮKassa.
+          readOnly: true
+          minLength: 39
+          maxLength: 39
+          examples:
+            - "rt-1da5c87d-0984-50e8-a7f3-8de646dd9ec9"
+        type:
+          $ref: "#/components/schemas/ReceiptType"
+          description: |
+            Тип чека в онлайн-кассе: приход (`payment`) или возврат прихода (`refund`).
+          readOnly: true
+        payment_id:
+          type: string
+          description: |
+            Идентификатор [платежа](https://yookassa.ru/developers/api#payment_object), для которого был сформирован чек.
+          examples:
+            - "215d8da0-000f-50be-b000-0003308c89be"
+        refund_id:
+          type: string
+          description: |
+            Идентификатор [возврата](https://yookassa.ru/developers/api#refund_object), для которого был сформирован чек. 
+            Отсутствует в чеке платежа."
+          readOnly: true
+          examples:
+            - "216749da-000f-50be-b000-096747fad91e"
+        status:
+          $ref: "#/components/schemas/ReceiptStatus"
+          description: |
+            Статус доставки данных для чека в онлайн-кассу. Возможные значения:
+              - `pending` — данные в обработке;
+              - `succeeded` — чек успешно зарегистрирован;
+              - `canceled` — чек зарегистрировать не удалось; 
+              если используете [Чеки от ЮKassa](https://yookassa.ru/developers/payment-acceptance/receipts/54fz/yoomoney/basics), обратитесь в техническую поддержку, в остальных случаях сформируйте чек вручную."
+          readOnly: true
+        fiscal_document_number:
+          type: string
+          description: |
+            Номер фискального документа.
+          readOnly: true
+          examples:
+            - "3986"
+        fiscal_storage_number:
+          type: string
+          description: |
+            Номер фискального накопителя в кассовом аппарате.
+          readOnly: true
+          examples:
+            - "9288000100115785"
+        fiscal_attribute:
+          type: string
+          description: |
+            Фискальный признак чека. Формируется фискальным накопителем на основе данных, переданных для регистрации чека.
+          readOnly: true
+          examples:
+            - "2617603921"
+        registered_at:
+          type: string
+          format: date-time
+          description: |
+            Дата и время формирования чека в фискальном накопителе. Указывается в формате [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601).
+          readOnly: true
+          examples:
+            - "2019-05-13T17:56:00.000+03:00"
+        fiscal_provider_id:
+          type: string
+          description: |
+            Идентификатор чека в онлайн-кассе. Присутствует, если чек удалось зарегистрировать.
+          readOnly: true
+          examples:
+            - "fd9e9404-eaca-4000-8ec9-dc228ead2345"
+        items:
+          type: array
+          description: |
+            Список товаров в чеке (не более 100 товаров).
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/ReceiptItem"
+        settlements:
+          type: array
+          description: |
+            Перечень совершенных расчетов.
+          items:
+            $ref: "#/components/schemas/Settlement"
+        on_behalf_of:
+          type: string
+          description: |
+            Идентификатор магазина, от имени которого нужно отправить чек. Выдается ЮKassa. Присутствует, если вы используете [Сплитование платежей](https://yookassa.ru/developers/solutions-for-platforms/split-payments/basics).
+        tax_system_code:
+          $ref: '#/components/schemas/TaxSystemCode'
+          description: |
+            Система налогообложения магазина (тег в 54 ФЗ — 1055).\n\nДля сторонних онлайн-касс: обязательный параметр, если вы используете онлайн-кассу Атол Онлайн, обновленную до ФФД 1.2, или у вас несколько систем налогообложения, в остальных случаях не передается. [Перечень возможных значений](https://yookassa.ru/developers/payment-acceptance/receipts/54fz/other-services/parameters-values#tax-systems)
+            Для Чеков от ЮKassa: параметр передавать не нужно, ЮKassa его проигнорирует.
+        receipt_industry_details:
+          type: array
+          description: |
+            Отраслевой реквизит предмета расчета (тег в 54 ФЗ — 1260).
+          items:
+            $ref: "#/components/schemas/IndustryDetails"
+        receipt_operational_details:
+          $ref: "#/components/schemas/OperationalDetails"
+          description: |
+            Операционный реквизит чека (тег в 54 ФЗ — 1270).
+
+    ReceiptType:
+      type: string
+      enum: [payment, refund]
+      
+    ReceiptStatus:
+      type: string
+      enum: [pending, succeeded, canceled]
+      readOnly: true
+
+    ReceiptItem:
+      type: object
+      description: |
+        Информация о товаре.
+      required:
+        - description
+        - amount
+        - vat_code
+        - quantity
+      properties:
+        description:
+          type: string
+          description: |
+            Наименование товара (от 1 до 128 символов). Тег в 54 ФЗ — 1030.
+          minLength: 1
+          maxLength: 128
+        amount:
+          $ref: '#/components/schemas/Amount'
+          description: |
+            Цена товара (тег в 54 ФЗ — 1079).
+        quantity:
+          type: string
+          description: |
+            Количество товара (тег в 54 ФЗ — 1023). Для чеков по 54-ФЗ: можно передать целое или дробное число. Разделитель дробной части — точка, разделитель тысяч отсутствует. Максимально возможное значение и максимальное количество знаков после точки (для дробных значений) зависят от модели вашей онлайн-кассы. Для чеков от ЮKassa максимально возможное значение — 99999.999, не более 3 знаков после точки. Для чеков самозанятых: только целые положительные числа (без точки и дробной части).
+          pattern: '^\d+\.?\d{0,3}$'
+        vat_code:
+          type: integer
+          description: |
+            Ставка НДС (тег в 54 ФЗ — 1199). Для чеков по 54-ФЗ — перечень возможных значений. Для чеков самозанятых — фиксированное значение: `1`
+            Возможные значения — число от 1 до 10.
+            С 1 января 2025 года вводятся новые ставки НДС 5% и 7% (коды ставок: 7, 8, 9, 10).
+
+            | Код | Ставка НДС |
+            |-----|------------|
+            | 1   | Без НДС |
+            | 2   | НДС по ставке 0% |
+            | 3   | НДС по ставке 10% |
+            | 4   | НДС по ставке 20% |
+            | 5   | НДС по расчетной ставке 10/110 |
+            | 6   | НДС по расчетной ставке 20/120 |
+            | 7   | НДС по ставке 5% |
+            | 8   | НДС по ставке 7% |
+            | 9   | НДС по расчетной ставке 5/105 |
+            | 10  | НДС по расчетной ставке 7/107 |
+          enum: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        payment_mode:
+          type: string
+          description: |
+            Признак способа расчета
+
+            | Значение | Описание |
+            |----------|----------|
+            | full_prepayment | Полная предоплата |
+            | partial_prepayment | Частичная предоплата |
+            | advance | Аванс |
+            | full_payment | Полный расчет |
+            | partial_payment | Частичный расчет и кредит |
+            | credit | Кредит |
+            | credit_payment | Выплата по кредиту |
+          enum:
+            - full_prepayment
+            - partial_prepayment
+            - advance
+            - full_payment
+            - partial_payment
+            - credit
+            - credit_payment
+        payment_subject:
+          type: string
+          description: |
+            Признак предмета расчета (тег в 54 ФЗ — 1212) то, за что принимается оплата, например товар, услуга.
+
+            | Значение | Описание |
+            |----------|----------|
+            | commodity | Товар |
+            | excise | Подакцизный товар |
+            | job | Работа |
+            | service | Услуга |
+            | payment | Платеж |
+            | casino | Платеж казино |
+            | gambling_bet | Ставка в азартной игре |
+            | gambling_prize | Выигрыш азартной игры |
+            | lottery | Лотерейный билет |
+            | lottery_prize | Выигрыш в лотерею |
+            | intellectual_activity | Результаты интеллектуальной деятельности |
+            | agent_commission | Агентское вознаграждение |
+            | property_right | Имущественное право |
+            | non_operating_gain | Внереализационный доход |
+            | insurance_premium | Страховой сбор |
+            | sales_tax | Торговый сбор |
+            | resort_fee | Курортный сбор |
+            | composite | Несколько вариантов |
+            | another | Другое |
+            | marked | Товар, подлежащий маркировке (ФФД 1.2) |
+            | non_marked | Товар без маркировки (ФФД 1.2) |
+            | marked_excise | Маркированный подакцизный товар (ФФД 1.2) |
+            | non_marked_excise | Немаркированный подакцизный товар (ФФД 1.2) |
+            | fine | Выплата |
+            | tax | Страховые взносы |
+            | lien | Залог |
+            | cost | Расход |
+            | agent_withdrawals | Выдача денежных средств |
+            | pension_insurance_without_payouts | Взносы на обязательное пенсионное страхование ИП |
+            | pension_insurance_with_payouts | Взносы на обязательное пенсионное страхование |
+            | health_insurance_without_payouts | Взносы на обязательное медицинское страхование ИП |
+            | health_insurance_with_payouts | Взносы на обязательное медицинское страхование |
+            | health_insurance | Взносы на обязательное социальное страхование |
+          enum:
+            - commodity
+            - excise
+            - job
+            - service
+            - payment
+            - casino
+            - gambling_bet
+            - gambling_prize
+            - lottery
+            - lottery_prize
+            - intellectual_activity
+            - agent_commission
+            - property_right
+            - non_operating_gain
+            - insurance_premium
+            - sales_tax
+            - resort_fee
+            - composite
+            - another
+            - marked
+            - non_marked
+            - marked_excise
+            - non_marked_excise
+            - fine
+            - tax
+            - lien
+            - cost
+            - agent_withdrawals
+            - pension_insurance_without_payouts
+            - pension_insurance_with_payouts
+            - health_insurance_without_payouts
+            - health_insurance_with_payouts
+            - health_insurance
+        measure:
+          type: string
+          description: |
+            Единица измерения товара (тег в 54 ФЗ — 2108). Обязательный параметр, если используете Чеки от ЮKassa или онлайн-кассу, обновленную до ФФД 1.2.
+
+            | Значение | Описание |
+            |----------|----------|
+            | piece | Штука, единица товара |
+            | gram | Грамм |
+            | kilogram | Килограмм |
+            | ton | Тонна |
+            | centimeter | Сантиметр |
+            | decimeter | Дециметр |
+            | meter | Метр |
+            | square_centimeter | Квадратный сантиметр |
+            | square_decimeter | Квадратный дециметр |
+            | square_meter | Квадратный метр |
+            | milliliter | Миллилитр |
+            | liter | Литр |
+            | cubic_meter | Кубический метр |
+            | kilowatt_hour | Килловат-час |
+            | gigacalorie | Гигакалория |
+            | day | Сутки |
+            | hour | Час |
+            | minute | Минута |
+            | second | Секунда |
+            | kilobyte | Килобайт |
+            | megabyte | Мегабайт |
+            | gigabyte | Гигабайт |
+            | terabyte | Терабайт |
+            | another | Другое |
+          enum:
+            - piece
+            - gram
+            - kilogram
+            - ton
+            - centimeter
+            - decimeter
+            - meter
+            - square_centimeter
+            - square_decimeter
+            - square_meter
+            - milliliter
+            - liter
+            - cubic_meter
+            - kilowatt_hour
+            - gigacalorie
+            - day
+            - hour
+            - minute
+            - second
+            - kilobyte
+            - megabyte
+            - gigabyte
+            - terabyte
+            - another
+          default: piece
+        mark_quantity:
+          $ref: '#/components/schemas/MarkQuantity'
+          description: |
+            Дробное количество маркированного товара (тег в 54 ФЗ — 1291). Обязательный параметр, если одновременно выполняются эти условия: вы используете Чеки от ЮKassa или онлайн-кассу, обновленную до ФФД 1.2; товар нужно маркировать; поле `measure` имеет значение `piece`.
+        country_of_origin_code:
+          type: string
+          description: |
+            Код страны происхождения товара по общероссийскому классификатору стран мира (OК (MК (ИСО 3166) 004-97) 025-2001). Тег в 54 ФЗ — 1230. Пример: `RU`. Можно передавать, если используете онлайн-кассу Orange Data, Кит Инвест.
+          pattern: '^[A-Z]{2}$'
+        customs_declaration_number:
+          type: string
+          description: |
+            Номер таможенной декларации (от 1 до 32 символов). Тег в 54 ФЗ — 1231. Можно передавать, если используете онлайн-кассу Orange Data, Кит Инвест.
+          maxLength: 32
+        excise:
+          type: string
+          description: |
+            Сумма акциза товара с учетом копеек (тег в 54 ФЗ — 1229). Десятичное число с точностью до 2 знаков после точки. Можно передавать, если используете онлайн-кассу Orange Data, Кит Инвест.
+          pattern: '^\d+\.?\d{0,2}$'
+        product_code:
+          type: string
+          description: |
+            Код товара (тег в 54 ФЗ — 1162) — уникальный номер, который присваивается экземпляру товара при маркировке. Формат: число в шестнадцатеричном представлении с пробелами. Максимальная длина — 32 байта. Пример: `00 00 00 01 00 21 FA 41 00 23 05 41 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 12 00 AB 00`. Обязательный параметр, если одновременно выполняются эти условия: вы используете онлайн-кассу, обновленную до ФФД 1.05; товар нужно маркировать.
+          maxLength: 32
+        mark_code_info:
+          $ref: '#/components/schemas/MarkCodeInfo'
+          description: |
+            Код товара (тег в 54 ФЗ — 1163). Обязательный параметр, если одновременно выполняются эти условия: вы используете Чеки от ЮKassa или онлайн-кассу, обновленную до ФФД 1.2; товар нужно маркировать. Должно быть заполнено хотя бы одно поле.
+        mark_mode:
+          type: string
+          description: |
+            Режим обработки кода маркировки (тег в 54 ФЗ — 2102). Обязательный параметр, если одновременно выполняются эти условия: вы используете Чеки от ЮKassa или онлайн-кассу Атол Онлайн или BusinessRu, обновленную до ФФД 1.2; товар нужно маркировать. Должен принимать значение равное «0».
+        payment_subject_industry_details:
+          type: array
+          description: |
+            Отраслевой реквизит предмета расчета (тег в 54 ФЗ — 1260). Можно передавать, если используете Чеки от ЮKassa или онлайн-кассу, обновленную до ФФД 1.2.
+          items:
+            $ref: '#/components/schemas/IndustryDetails'
+
+    Customer:
+      type: object
+      description: |
+        Информация о плательщике.
+      properties:
+        full_name:
+          type: string
+          description: |
+            Для юрлица — название организации, для ИП и физического лица — ФИО.
+        inn:
+          type: string
+          description: |
+            ИНН плательщика (10 или 12 цифр).
+            Пример: 123456789.
+          pattern: '^\d{10}|\d{12}$'
+        email:
+          type: string
+          description: |
+            E-mail плательщика в формате RFC 822.
+            Пример: example@example.com.
+          format: email
+        phone:
+          type: string
+          description: |
+            Номер телефона плательщика в формате ITU-T E.164.
+            Пример: +79000000000.
+          pattern: '^\+[0-9]{1,3}[0-9]{10}$'
+
+    Deal:
+      type: object
+      description: |
+        Данные о сделке.
+      properties:
+        id:
+          type: string
+          description: |
+            Идентификатор сделки.
+          readOnly: true
+        settlements:
+          type: array
+          description: |
+            Данные о распределении денег.
+          items:
+            $ref: '#/components/schemas/Settlement'
+          readOnly: true
+        status:
+          type: string
+          description: |
+            Статус сделки. Возможные значения:
+            opened — сделка открыта;
+            closed — сделка закрыта.
+          enum:
+            - opened
+            - closed
+          readOnly: true
+        balance:
+          $ref: '#/components/schemas/Amount'
+          description: |
+            Баланс сделки.
+          readOnly: true
+        payout_balance:
+          $ref: '#/components/schemas/Amount'
+          description: |
+            Сумма вознаграждения продавца.
+          readOnly: true
+        description:
+          type: string
+          description: |
+            Описание сделки.
+        metadata:
+          type: object
+          description: |
+            Любые дополнительные данные, которые нужны вам для работы (например, ваш внутренний идентификатор заказа).
+          additionalProperties:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+          description: |
+            Время создания сделки. Указывается по UTC и передается в формате ISO 8601.
+            Пример: 2017-11-03T11:52:31.827Z.
+          readOnly: true
+        expires_at:
+          type: string
+          format: date-time
+          description: |
+            Время автоматического закрытия сделки. Указывается по UTC и передается в формате ISO 8601.
+            Пример: 2017-11-03T11:52:31.827Z.
+          readOnly: true
+        fee_moment:
+          type: string
+          description: |
+            Момент перечисления вам вознаграждения платформы. Возможные значения:
+            payment_succeeded — после успешной оплаты;
+            deal_closed — после закрытия сделки.
+          enum:
+            - payment_succeeded
+            - deal_closed
+          readOnly: true
+        test:
+          type: boolean
+          description: |
+            Признак тестовой операции.
+          readOnly: true
+
+    Transfer:
+      type: object
+      required:
+        - account_id
+        - amount
+        - platform_fee_amount
+      description: |
+        Данные о распределении денег между магазинами. Присутствует, если вы используете Сплитование платежей.
+      properties:
+        account_id:
+          type: string
+          description: |
+            Идентификатор магазина, в пользу которого вы принимаете оплату.
+            Формат: идентификатор магазина в ЮKassa.
+          example: "100500"
+        amount:
+          $ref: '#/components/schemas/Amount'
+          description: |
+            Сумма перевода.
+        platform_fee_amount:
+          $ref: '#/components/schemas/Amount'
+          description: |
+            Комиссия за проданные товары и услуги, которая удерживается с магазина в вашу пользу.
+        description:
+          type: string
+          description: |
+            Описание транзакции, которое продавец увидит в личном кабинете ЮKassa. (например: «Заказ маркетплейса №72»).
+          maxLength: 128
+          example: "Заказ №72"
+        metadata:
+          type: object
+          description: |
+            Любые дополнительные данные, которые нужны вам для работы (например, ваш внутренний идентификатор заказа).
+          additionalProperties:
+            type: string
+            maxLength: 512
+
+    CreatePaymentReceipt:
+      type: object
+      description: |
+        Данные для формирования чека в онлайн-кассе (для соблюдения 54-ФЗ).
+      required:
+        - items
+      properties:
+        customer:
+          $ref: '#/components/schemas/Customer'
+          description: |
+            Информация о плательщике.
+        items:
+          type: array
+          description: |
+            Список товаров в заказе.
+          items:
+            $ref: '#/components/schemas/ReceiptItem'
+          minItems: 1
+        tax_system_code:
+          $ref: '#/components/schemas/TaxSystemCode'
+          description: |
+            Система налогообложения магазина (тег в 54 ФЗ — 1055).
+        phone:
+          type: string
+          description: |
+            Номер телефона плательщика в формате ITU-T E.164.
+            Пример: +79000000000.
+          pattern: '^\+[0-9]{1,3}[0-9]{10}$'
+        email:
+          type: string
+          description: |
+            E-mail плательщика в формате RFC 822.
+            Пример: example@example.com.
+          format: email
+        receipt_industry_details:
+          type: array
+          description: |
+            Отраслевой реквизит чека.
+          items:
+            $ref: '#/components/schemas/IndustryDetails'
+        receipt_operational_details:
+          $ref: '#/components/schemas/OperationalDetails'
+          description: |
+            Операционный реквизит чека.
+
+    OperationalDetails:
+      type: object
+      required: [operation_id, value, created_at]
+      description: Операционный реквизит чека (тег в 54 ФЗ — 1270). Можно передавать, если используете Чеки от ЮKassa или онлайн-кассу, обновленную до ФФД 1.2.
+      properties:
+        operation_id:
+          type: integer
+          minimum: 0
+          maximum: 255
+          description: Идентификатор операции (тег в 54 ФЗ — 1271). Число от 0 до 255.
+        value:
+          type: string
+          description: Данные операции (тег в 54 ФЗ — 1272).
+        created_at:
+          type: string
+          format: date-time
+          description: Время создания операции (тег в 54 ФЗ — 1273). Указывается по UTC и передается в формате ISO 8601. Пример, 2017-11-03T11:52:31.827Z
+          example: "2017-11-03T11:52:31.827Z"
+
+    PaymentMethodDataApplePay:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: apple_pay
+              default: apple_pay
+            payment_data:
+              type: string
+              description: |
+                Закодированные данные для проведения оплаты через Apple Pay.
+                Передается JSON-объект в виде строки, содержащий параметры `paymentData`, полученные от Apple Pay.
+
+    PaymentMethodDataGooglePay:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: google_pay
+              default: google_pay
+            payment_data:
+              type: string
+              description: |
+                Закодированные данные для проведения оплаты через Google Pay.
+                Передается JSON-объект в виде строки, содержащий параметры `paymentMethodToken`, полученные от Google Pay.
+            payment_method_token:
+              type: string
+              description: |
+                Токен для проведения оплаты через Google Pay.
+                Альтернатива параметру payment_data. Передается в виде строки, содержащей параметр `paymentMethodToken`, полученный от Google Pay.
+
+    PaymentMethodDataInstallments:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: installments
+              default: installments
+
+    PaymentMethodDataSBP:
+      allOf:
+        - $ref: '#/components/schemas/PaymentMethodDataBase'
+        - type: object
+          properties:
+            type:
+              const: sbp
+              default: sbp
+            merchant_client_id:
+              type: string
+              description: |
+                Идентификатор покупателя в вашей системе. Например, электронная почта или номер телефона.
+                Не более 200 символов.
+              maxLength: 200
+
+    MarkQuantity:
+      type: object
+      description: |
+        Дробное количество маркированного товара (тег в 54 ФЗ — 1291).
+      required:
+        - numerator
+        - denominator
+      properties:
+        numerator:
+          type: integer
+          minimum: 1
+          description: "Числитель — количество продаваемых товаров из одной потребительской упаковки (тег в 54 ФЗ — 1293). Не может превышать `denominator`."
+          example: 1
+        denominator:
+          type: integer
+          minimum: 1
+          description: "Знаменатель — общее количество товаров в потребительской упаковке (тег в 54 ФЗ — 1294)."
+          example: 100
+
+    MarkCodeInfo:
+      type: object
+      description: |
+        Код товара (тег в 54 ФЗ — 1163).
+      properties:
+        mark_code_raw:
+          type: string
+          description: |
+            Код маркировки товара в том виде, в котором он был прочитан сканером (тег в 54 ФЗ — 2000). Обязательный параметр, если передается mark_code.
+        mark_code:
+          type: string
+          description: |
+            Код маркировки товара (тег в 54 ФЗ — 2100). Обязательный параметр, если передается mark_code_raw.
+            example: "010460406000590021N4N57RTCBUZTQ\\u001d2403054002410161218\\u001d1424010191ffd0\\u001g92tIAF/YVpU4roQS3M/m4z78yFq0nc/WsSmLeX6QkF/YVWwy5IMYAeiQ91Xa2m/fFSJcOkb2N+uUUtfr4n0mOX0Q=="
+        unknown:
+          type: string
+          description: |
+            Нераспознанный код товара (тег в 54 ФЗ — 2108). Передается, если невозможно определить формат марки.
+        ean_8:
+          type: string
+          description: |
+            Код товара в формате EAN-8 (тег в 54 ФЗ — 2101). Тип кода маркировки товара.
+        ean_13:
+          type: string
+          description: |
+            Код товара в формате EAN-13 (тег в 54 ФЗ — 2102). Тип кода маркировки товара.
+        itf_14:
+          type: string
+          description: |
+            Код товара в формате ITF-14 (тег в 54 ФЗ — 2103). Тип кода маркировки товара.
+        gs_10:
+          type: string
+          description: |
+            Код товара в формате GS1.0 (тег в 54 ФЗ — 2104). Тип кода маркировки товара.
+        gs_1m:
+          type: string
+          description: |
+            Код товара в формате GS1.M (тег в 54 ФЗ — 2105). Тип кода маркировки товара.
+        short:
+          type: string
+          description: |
+            Код товара в формате короткого кода маркировки (тег в 54 ФЗ — 2106). Тип кода маркировки товара.
+        fur:
+          type: string
+          description: |
+            Контрольно-идентификационный знак мехового изделия (тег в 54 ФЗ — 2107). Тип кода маркировки товара.
+        egais_20:
+          type: string
+          description: |
+            Код товара в формате ЕГАИС-2.0 (тег в 54 ФЗ — 2108). Тип кода маркировки товара.
+        egais_30:
+          type: string
+          description: |
+            Код товара в формате ЕГАИС-3.0 (тег в 54 ФЗ — 2109). Тип кода маркировки товара.
+
+    IndustryDetails:
+      type: object
+      description: |
+        Отраслевой реквизит предмета расчета (тег в 54 ФЗ — 1260).
+      required:
+        - federal_id
+        - value
+      properties:
+        federal_id:
+          type: string
+          description: |
+            Идентификатор ФОИВ. Число от 3 до 12 цифр.
+            001 — Минфин России
+            002 — Минсельхоз России
+            003 — Минкультуры России
+            004 — МВД России
+            005 — Минздрав России
+            006 — Минтранс России
+          pattern: '^\d{3,12}$'
+          example: "001"
+        value:
+          type: string
+          description: |
+            Значение отраслевого реквизита. Максимальная длина строки — 256 символов.
+          maxLength: 256
+          example: "Значение отраслевого реквизита"
+        document_date:
+          type: string
+          format: date
+          description: |
+            Дата нормативного акта федерального органа исполнительной власти, регулирующего соответствующую отрасль (сферу) деятельности.
+          example: "2020-01-01"
+        document_number:
+          type: string
+          description: |
+            Номер нормативного акта федерального органа исполнительной власти, регулирующего соответствующую отрасль (сферу) деятельности.
+          example: "1"
+
+    TaxSystemCode:
+      type: integer
+      description: |
+        Система налогообложения магазина (тег в 54 ФЗ — 1055).
+        
+        | Код | Система налогообложения |
+        |-----|-------------------------|
+        | 1   | Общая система налогообложения |
+        | 2   | Упрощенная (УСН, доходы) |
+        | 3   | Упрощенная (УСН, доходы минус расходы) |
+        | 4   | Единый налог на вмененный доход (ЕНВД) |
+        | 5   | Единый сельскохозяйственный налог (ЕСН) |
+        | 6   | Патентная система налогообложения |
+      enum:
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+      example: 1
+
+    ReceiptsList:
+      type: object
+      required:
+        - type
+        - items
+      properties:
+        type:
+          type: string
+          enum:
+            - list
+          default: list
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Receipt'
+        next_cursor:
+          type: string
+          description: Токен для получения следующей страницы списка.
+
+    CreateReceiptRequest:
+      type: object
+      required:
+        - customer
+        - items
+      properties:
+        customer:
+          $ref: '#/components/schemas/Customer'
+          description: |
+            Информация о пользователе. Необходимо указать как минимум контактные данные: для Чеков от ЮKassa — электронную почту (customer.email), в остальных случаях — электронную почту (customer.email) или номер телефона (customer.phone).
+        items:
+          type: array
+          description: |
+            Список товаров в заказе. Для чеков по 54-ФЗ можно передать не более 100 товаров, для чеков самозанятых — не более шести.
+          items:
+            $ref: '#/components/schemas/ReceiptItem'
+          minItems: 1
+        tax_system_code:
+          $ref: '#/components/schemas/TaxSystemCode'
+          description: |
+            Система налогообложения магазина (тег в 54 ФЗ — 1055).
+        payment_id:
+          type: string
+          description: |
+            Идентификатор платежа в ЮKassa. Указывается, если чек выдается после успешного платежа.
+        refund_id:
+          type: string
+          description: |
+            Идентификатор возврата в ЮKassa. Указывается, если чек выдается после успешного возврата.
+        receipt_industry_details:
+          type: array
+          description: |
+            Отраслевой реквизит чека.
+          items:
+            $ref: '#/components/schemas/IndustryDetails'
+        receipt_operational_details:
+          $ref: '#/components/schemas/OperationalDetails'
+          description: |
+            Операционный реквизит чека.
+        send:
+          type: boolean
+          description: |
+            Признак отправки чека по электронной почте или SMS. Значение по умолчанию — true.
+
+  responses:
+    BadRequest:
+      description: Неверные параметры запроса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Unauthorized:
+      description: Ошибка аутентификации
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    TooManyRequests:
+      description: Слишком много запросов
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  parameters:
+    PaymentId:
+      name: payment_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Идентификатор платежа.
+
+paths:
+  /payments:
+    post:
+      operationId: createPayment
+      summary: Создание платежа
+      description: |
+        Чтобы принять оплату, необходимо создать объект платежа — `Payment`. Он содержит всю необходимую информацию для проведения оплаты (сумму, валюту и статус). У платежа линейный жизненный цикл, он последовательно переходит из статуса в статус.
+      tags:
+        - Payments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '200':
+          description: Платеж создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-idempotency: true
+
+    get:
+      operationId: getPaymentsList
+      summary: Список платежей
+      description: Возвращает список платежей с возможностью фильтрации и постраничной выборки.
+      tags:
+        - Payments
+      parameters:
+        - name: created_at.gte
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Фильтр по времени создания платежа. Возвращаются платежи, созданные после указанного времени.
+        - name: created_at.lte
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Фильтр по времени создания платежа. Возвращаются платежи, созданные до указанного времени.
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/PaymentStatus'
+          description: Фильтр по статусу платежа.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Ограничение количества объектов платежа, отображаемых на одной странице выдачи.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Токен для получения следующей страницы выборки.
+      responses:
+        '200':
+          description: Список платежей
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentsList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /payments/{payment_id}:
+    get:
+      operationId: getPayment
+      summary: Информация о платеже
+      description: |
+        Возвращает информацию о платеже по его уникальному идентификатору.
+      tags:
+        - Payments
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Информация о платеже
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /payments/{payment_id}/capture:
+    post:
+      operationId: capturePayment
+      summary: Подтверждение платежа
+      description: |
+        Подтверждает вашу готовность принять платеж. После подтверждения платеж перейдет в статус `succeeded`. Это значит, что вы можете выдать товар или оказать услугу пользователю.
+
+        Подтвердить можно только платеж в статусе `waiting_for_capture` и только в течение определенного времени (зависит от способа оплаты). Если вы не подтвердите платеж в отведенное время, он автоматически перейдет в статус `canceled`, и деньги вернутся пользователю.
+      tags:
+        - Payments
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapturePaymentRequest'
+      responses:
+        '200':
+          description: Платеж подтвержден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-idempotency: true
+
+  /payments/{payment_id}/cancel:
+    post:
+      operationId: cancelPayment
+      summary: Отмена платежа
+      description: |
+        Отменяет платеж, находящийся в статусе `waiting_for_capture`. 
+        Отмена платежа невозможна, если платеж уже подтвержден.
+      tags:
+        - Payments
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: Платеж отменен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-idempotency: true
+
+  /refunds:
+    post:
+      operationId: createRefund
+      summary: Создание возврата
+      description: |
+        Создает возврат платежа — `Refund`. Возвращает успешно завершенный платеж по уникальному идентификатору платежа.
+      tags:
+        - Refunds
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRefundRequest'
+      responses:
+        '200':
+          description: Возврат создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refund'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-idempotency: true
+
+    get:
+      operationId: getRefundsList
+      summary: Список возвратов
+      description: Возвращает список возвратов с возможностью фильтрации и постраничной выборки.
+      tags:
+        - Refunds
+      parameters:
+        - name: created_at.gte
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Фильтр по времени создания возврата. Возвращаются возвраты, созданные после указанного времени.
+        - name: created_at.lte
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Фильтр по времени создания возврата. Возвращаются возвраты, созданные до указанного времени.
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - pending
+              - succeeded
+              - canceled
+          description: Фильтр по статусу возврата.
+        - name: payment_id
+          in: query
+          schema:
+            type: string
+          description: Фильтр по идентификатору платежа.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Ограничение количества объектов возврата, отображаемых на одной странице выдачи.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Токен для получения следующей страницы выборки.
+      responses:
+        '200':
+          description: Список возвратов
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - type
+                  - items
+                properties:
+                  type:
+                    type: string
+                    enum:
+                      - list
+                    default: list
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Refund'
+                  next_cursor:
+                    type: string
+                    description: Токен для получения следующей страницы списка.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /refunds/{refund_id}:
+    get:
+      operationId: getRefund
+      summary: Информация о возврате
+      description: |
+        Возвращает информацию о возврате по его уникальному идентификатору.
+      tags:
+        - Refunds
+      parameters:
+        - name: refund_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Идентификатор возврата.
+      responses:
+        '200':
+          description: Информация о возврате
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refund'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+
+  /receipts:
+    post:
+      operationId: createReceipt
+      summary: Создание чека
+      description: |
+        Создает чек для указанного платежа или возврата.
+        
+        Чек можно создать только при наличии успешного платежа или возврата.
+        Если вы создаете чек для платежа, то передайте параметр payment_id.
+        Если для возврата — refund_id.
+      tags:
+        - Receipts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReceiptRequest'
+      responses:
+        '200':
+          description: Чек успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Receipt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-idempotency: true
+
+    get:
+      operationId: getReceiptsList
+      summary: Список чеков
+      description: |
+        Возвращает список чеков с возможностью фильтрации и постраничной выборки.
+        
+        Список чеков возвращается отсортированным по времени создания в порядке убывания.
+        Если результатов больше, чем задано в параметре limit, список будет выводиться фрагментами.
+        В этом случае в ответе на запрос вернется фрагмент списка и параметр next_cursor с указателем на следующий фрагмент.
+      tags:
+        - Receipts
+      parameters:
+        - name: payment_id
+          in: query
+          schema:
+            type: string
+          description: Фильтр по идентификатору платежа
+        - name: refund_id
+          in: query
+          schema:
+            type: string
+          description: Фильтр по идентификатору возврата
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - pending
+              - succeeded
+              - canceled
+          description: |
+            Фильтр по статусу чека. Возможные значения:
+            * pending — чек в очереди на создание
+            * succeeded — чек успешно создан
+            * canceled — чек не удалось создать
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Количество чеков на странице. По умолчанию 20, максимум 100.
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Токен для получения следующей страницы списка
+      responses:
+        '200':
+          description: Список чеков
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptsList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /receipts/{receipt_id}:
+    get:
+      operationId: getReceipt
+      summary: Информация о чеке
+      description: |
+        Возвращает информацию о чеке по его уникальному идентификатору.
+        
+        Выдает информацию о чеке, включая его статус, данные о товарах, получателе и налогах.
+      tags:
+        - Receipts
+      parameters:
+        - name: receipt_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Идентификатор чека
+      responses:
+        '200':
+          description: Информация о чеке
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Receipt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
