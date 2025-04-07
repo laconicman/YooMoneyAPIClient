@@ -2,7 +2,7 @@ import OpenAPIRuntime
 import OpenAPIURLSession
 import HTTPTypes
 import Foundation
-import LoggingMiddleware
+import OSLogLoggingMiddleware
 
 // Convenient alias to distinguish this particular client
 public typealias YooClient = YooMoneyAPI.Client
@@ -15,7 +15,7 @@ public extension Client {
         let basicAuthMiddleware = HeaderMiddleware(authorizationHeaderFieldValue: "Basic \(credentials.encoded)")
         let middlewares: [any ClientMiddleware]
         if #available(macOS 11.0, *) {
-            middlewares = [basicAuthMiddleware, LoggingMiddleware(bodyLoggingConfiguration: .upTo(maxBytes: 2048))]
+            middlewares = [basicAuthMiddleware, OSLogLoggingMiddleware(bodyLoggingConfiguration: .upTo(maxBytes: 2048))]
         } else {
             // Fallback on earlier versions
             middlewares = [basicAuthMiddleware]

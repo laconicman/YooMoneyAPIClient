@@ -43,7 +43,7 @@ print("Received the greeting message: \(message)")
 For testing purposes you can use default `Credentials` `fromEnvironment` static var. In this case you need to set environment variables "APP_USERNAME" and "APP_PASSWORD". In Xcode you can set them with `Edit sheme` menu.
 
 ## TODO:
- - Move `HeaderMiddleware` to a separate SPM (as with `LoggingMiddleware`).
+ - Move `HeaderMiddleware` to a separate SPM (as with `OSLogLoggingMiddleware`).
  - Document main funcs
  - Refactor OpenAPI spec as for `Confirmation` related schemas. [done].
    Note that Swift types for schemas with `discriminator` have two issues:
