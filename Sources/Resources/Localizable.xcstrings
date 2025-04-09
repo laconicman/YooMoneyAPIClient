@@ -1,0 +1,46 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Currencies of items don't match order currency." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Валюта товаров не соответствует валюте заказа."
+          }
+        }
+      }
+    },
+    "No order details provided (empty cart)." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Детали заказа не указаны (корзина пуста)."
+          }
+        }
+      }
+    },
+    "Order id can not be blank." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "id заказа не может быть пустым."
+          }
+        }
+      }
+    },
+    "Something went wrong." : {
+      "localizations" : {
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Что-то пошло не так."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

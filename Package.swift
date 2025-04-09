@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "YooMoneyAPI",
+    defaultLocalization: "en",
     platforms: [.macOS(.v11), .iOS(.v14), .tvOS(.v14), .watchOS(.v7), .visionOS(.v1)],
     products: [.library(name: "YooMoneyAPI", targets: ["YooMoneyAPI"])],
     dependencies: [
