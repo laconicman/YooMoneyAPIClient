@@ -3836,7 +3836,7 @@ public enum Components {
             ///
             ///
             /// - Remark: Generated from `#/components/schemas/ReceiptItem/quantity`.
-            public var quantity: Swift.String
+            public var quantity: Swift.Double
             /// Ставка НДС (тег в 54 ФЗ — 1199). Для чеков по 54-ФЗ — перечень возможных значений. Для чеков самозанятых — фиксированное значение: `1`
             /// Возможные значения — число от 1 до 10.
             /// С 1 января 2025 года вводятся новые ставки НДС 5% и 7% (коды ставок: 7, 8, 9, 10).
@@ -4192,7 +4192,7 @@ public enum Components {
             public init(
                 description: Swift.String,
                 amount: Components.Schemas.Amount,
-                quantity: Swift.String,
+                quantity: Swift.Double,
                 vatCode: Components.Schemas.ReceiptItem.VatCodePayload,
                 paymentMode: Components.Schemas.ReceiptItem.PaymentModePayload? = nil,
                 paymentSubject: Components.Schemas.ReceiptItem.PaymentSubjectPayload? = nil,

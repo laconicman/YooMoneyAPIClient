@@ -1,9 +1,9 @@
 # YooMoney (YooKassa) client library
 
-Project is using [Swift OpenAPI Generator](https://github.com/apple/swift-openapi-generator), connected as plugin, so it automatically regenerates the code to reflect changes made to OpenAPI specifiation in `openapi.yaml`.
+Project is using [Swift OpenAPI Generator](https://github.com/apple/swift-openapi-generator), connected as plugin, so it semi-automatically regenerates the code to reflect changes made to OpenAPI specifiation in `openapi.yaml`.
 Keep this in mind if you need to make changes to API related logic and feel free to propose pull requests.
 
-> **Disclaimer:** This is unoficial project, build only based on [the ofical doc](https://yookassa.ru/developers/api).
+> **Disclaimer:** This is unofficial project, build only based on [the official doc](https://yookassa.ru/developers/api).
 OpenAPI specification was as well build by the author of the project since no official one was provided even by requests.
 
 ## Overview
@@ -33,18 +33,18 @@ In another package or project, add this one as a package dependency.
 Then, use the provided client API:
 
 ```swift
-import YooClient
+import YooMoneyAPI
 
-let client = YooClient()
-let message = try await client.createPayment(amount: 123)
-print("Received the greeting message: \(message)")
+let client = YooMoneyAPIClient()
+let response = try await client.createPayment(amount: 123)
+print("Received response: \(response)")
 ```
 
-For testing purposes you can use default `Credentials` `fromEnvironment` static var. In this case you need to set environment variables "APP_USERNAME" and "APP_PASSWORD". In Xcode you can set them with `Edit sheme` menu.
+For testing purposes you can use default `Credentials` `fromEnvironment` static var. In this case you need to set environment variables "APP_USERNAME" and "APP_PASSWORD". In Xcode you can set them with `Edit scheme` menu.
 
 ## TODO:
  - Move `HeaderMiddleware` to a separate SPM (as with `OSLogLoggingMiddleware`).
- - Document main funcs
+ - Document main functions
  - Refactor OpenAPI spec as for `Confirmation` related schemas. [done].
    Note that Swift types for schemas with `discriminator` have two issues:
    Refer to: https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.0.md
