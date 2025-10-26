@@ -1,7 +1,7 @@
 public extension Components.Schemas.Amount {
     @available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)
     static func from(items: [Components.Schemas.ReceiptItem]) throws -> Self {
-        let amountValuesSum = items.map({ $0.amount.value.double * $0.quantity.double }).reduce(0.0, +)
+        let amountValuesSum = items.map({ $0.amount.value.double * $0.quantity }).reduce(0.0, +)
         let currencies = Set(items.map(\.amount.currency))
         guard let currency = currencies.first, currencies.count == 1 else {
             throw ValidationError.itemCurrencyMismatch
@@ -25,8 +25,8 @@ public extension Components.Schemas.Customer {
 }
 
 public extension Components.Schemas.ReceiptItem {
-    static let exampleItem1: Self = .init(description: "CopyBar", amount: .init(value: "480.0", currency: "RUB"), quantity: "4", vatCode: ._1, paymentMode: .fullPayment, paymentSubject: .commodity, measure: .piece)
-    static let exampleItem2: Self = .init(description: "Pack", amount: .init(value: "4.0", currency: "RUB"), quantity: "1", vatCode: ._1, paymentMode: .fullPayment, paymentSubject: .commodity, measure: .piece)
+    static let exampleItem1: Self = .init(description: "CopyBar", amount: .init(value: "480.0", currency: "RUB"), quantity: 4, vatCode: ._1, paymentMode: .fullPayment, paymentSubject: .commodity, measure: .piece)
+    static let exampleItem2: Self = .init(description: "Pack", amount: .init(value: "4.0", currency: "RUB"), quantity: 1, vatCode: ._1, paymentMode: .fullPayment, paymentSubject: .commodity, measure: .piece)
 }
 
 public extension [Components.Schemas.ReceiptItem] {
